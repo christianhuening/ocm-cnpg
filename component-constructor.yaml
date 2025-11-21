@@ -37,7 +37,7 @@ components:
       # ============================================
       - name: postgresql-17
         type: ociImage
-        version: ${PG_VERSION_17}
+        version: "${PG_VERSION_17}"
         relation: external
         access:
           type: ociArtifact
@@ -55,7 +55,7 @@ components:
       # ============================================
       - name: postgresql-16
         type: ociImage
-        version: ${PG_VERSION_16}
+        version: "${PG_VERSION_16}"
         relation: external
         access:
           type: ociArtifact
@@ -75,7 +75,7 @@ components:
       # ============================================
       - name: postgresql-15
         type: ociImage
-        version: ${PG_VERSION_15}
+        version: "${PG_VERSION_15}"
         relation: external
         access:
           type: ociArtifact
@@ -93,7 +93,7 @@ components:
       # ============================================
       - name: postgresql-14
         type: ociImage
-        version: ${PG_VERSION_14}
+        version: "${PG_VERSION_14}"
         relation: external
         access:
           type: ociArtifact
@@ -113,7 +113,7 @@ components:
       # Operator Configuration
       - name: operator-configmap
         type: yaml
-        version: ${CNPG_VERSION}
+        version: "1.0.0"
         relation: local
         input:
           type: file
@@ -124,7 +124,7 @@ components:
 
       - name: monitoring-queries
         type: yaml
-        version: ${CNPG_VERSION}
+        version: "1.0.0"
         relation: local
         input:
           type: file
@@ -136,7 +136,7 @@ components:
       # Cluster Configuration Templates
       - name: cluster-basic
         type: yaml
-        version: ${CNPG_VERSION}
+        version: "1.0.0"
         relation: local
         input:
           type: file
@@ -149,7 +149,7 @@ components:
 
       - name: cluster-ha
         type: yaml
-        version: ${CNPG_VERSION}
+        version: "1.0.0"
         relation: local
         input:
           type: file
@@ -162,7 +162,7 @@ components:
 
       - name: cluster-backup-s3
         type: yaml
-        version: ${CNPG_VERSION}
+        version: "1.0.0"
         relation: local
         input:
           type: file
@@ -175,7 +175,7 @@ components:
 
       - name: cluster-backup-gcs
         type: yaml
-        version: ${CNPG_VERSION}
+        version: "1.0.0"
         relation: local
         input:
           type: file
@@ -188,7 +188,7 @@ components:
 
       - name: cluster-backup-azure
         type: yaml
-        version: ${CNPG_VERSION}
+        version: "1.0.0"
         relation: local
         input:
           type: file
@@ -201,7 +201,7 @@ components:
 
       - name: cluster-monitoring
         type: yaml
-        version: ${CNPG_VERSION}
+        version: "1.0.0"
         relation: local
         input:
           type: file

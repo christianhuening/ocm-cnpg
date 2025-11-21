@@ -13,9 +13,10 @@ CNPG_VERSION: "1.24.1"
 
 # PostgreSQL Versions
 # See: https://github.com/cloudnative-pg/postgres-containers/pkgs/container/postgresql
-PG_VERSION_17: "17.2"
-PG_VERSION_16: "16.6"
-PG_VERSION_15: "15.10"
-PG_VERSION_14: "14.15"
+# Note: Using simple two-part versions
+PG_VERSION_17: "17"
+PG_VERSION_16: "16"
+PG_VERSION_15: "15"
+PG_VERSION_14: "14"
 
 # Note: PostgreSQL version 16 is marked as the default version in the component descriptor

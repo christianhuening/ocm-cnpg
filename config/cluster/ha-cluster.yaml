@@ -53,9 +53,10 @@ spec:
     storageClass: ${STORAGE_CLASS}
 
   # WAL storage (optional, for improved I/O performance)
-  ${WAL_STORAGE_SIZE:+walStorage:}
-  ${WAL_STORAGE_SIZE:+  size: ${WAL_STORAGE_SIZE}}
-  ${WAL_STORAGE_CLASS:+  storageClass: ${WAL_STORAGE_CLASS}}
+  # Uncomment and configure if you want separate WAL storage
+  # walStorage:
+  #   size: 20Gi
+  #   storageClass: fast-ssd
 
   # Resource limits and requests (production-sized)
   resources:
@@ -134,9 +135,10 @@ spec:
   # Monitoring configuration
   monitoring:
     enablePodMonitor: ${ENABLE_MONITORING:-true}
-    ${CUSTOM_QUERIES_CONFIGMAP:+customQueriesConfigMap:}
-    ${CUSTOM_QUERIES_CONFIGMAP:+  - name: ${CUSTOM_QUERIES_CONFIGMAP}}
-    ${CUSTOM_QUERIES_CONFIGMAP:+    key: queries}
+    # Uncomment to add custom monitoring queries
+    # customQueriesConfigMap:
+    #   - name: cnpg-monitoring-queries
+    #     key: queries
 
   # Node maintenance window
   nodeMaintenanceWindow:

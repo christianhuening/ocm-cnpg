@@ -85,9 +85,10 @@ spec:
         key: queries
 
     # Custom monitoring secret (for queries with sensitive data)
-    ${CUSTOM_QUERIES_SECRET:+customQueriesSecret:}
-    ${CUSTOM_QUERIES_SECRET:+  - name: ${CUSTOM_QUERIES_SECRET}}
-    ${CUSTOM_QUERIES_SECRET:+    key: queries}
+    # Uncomment to add custom queries from a secret
+    # customQueriesSecret:
+    #   - name: cnpg-monitoring-queries-secret
+    #     key: queries
 
 ---
 # Custom Monitoring Queries ConfigMap

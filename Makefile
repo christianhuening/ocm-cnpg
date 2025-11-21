@@ -122,3 +122,55 @@ info: ## Show build configuration
 .PHONY: all
 all: clean build validate ## Clean, build and validate
 	@echo "Build complete!"
+
+# ============================================
+# Testing targets
+# ============================================
+
+.PHONY: test
+test: ## Run complete test suite (requires Docker, KIND, kubectl)
+	@echo "Running test suite..."
+	@./test/test-suite.sh
+
+.PHONY: test-quick
+test-quick: ## Run quick tests (component build and validation only)
+	@echo "Running quick tests..."
+	@SKIP_K8S_TESTS=true ./test/test-suite.sh
+
+.PHONY: test-component
+test-component: build validate ## Test component build and structure
+	@echo "Testing component structure..."
+	@$(OCM) get resources $(BUILD_DIR) -o yaml > /dev/null && echo "✓ Component resources valid"
+	@echo "✓ Component tests passed"
+
+.PHONY: test-templates
+test-templates: build ## Extract and validate all configuration templates
+	@echo "Testing configuration templates..."
+	@mkdir -p /tmp/ocm-test-templates
+	@for template in operator-configmap monitoring-queries cluster-basic cluster-ha cluster-backup-s3 cluster-monitoring; do \
+		echo "  Testing $$template..."; \
+		$(OCM) download resource $(BUILD_DIR) $$template -O /tmp/ocm-test-templates/$$template.yaml 2>/dev/null || \
+			(echo "✗ Failed to extract $$template" && exit 1); \
+		kubectl apply --dry-run=client -f /tmp/ocm-test-templates/$$template.yaml > /dev/null 2>&1 || \
+			(echo "✗ Invalid YAML in $$template" && exit 1); \
+		echo "  ✓ $$template valid"; \
+	done
+	@rm -rf /tmp/ocm-test-templates
+	@echo "✓ All templates valid"
+
+.PHONY: test-kind
+test-kind: ## Create KIND cluster and deploy test resources
+	@echo "Running Kubernetes tests in KIND..."
+	@KIND_CLUSTER_NAME=cnpg-test CLEANUP_ON_SUCCESS=true ./test/test-suite.sh
+
+.PHONY: test-kind-keep
+test-kind-keep: ## Create KIND cluster and keep it running (for debugging)
+	@echo "Running Kubernetes tests in KIND (keeping cluster)..."
+	@KIND_CLUSTER_NAME=cnpg-test CLEANUP_ON_SUCCESS=false ./test/test-suite.sh
+
+.PHONY: test-clean
+test-clean: ## Clean up test resources
+	@echo "Cleaning up test resources..."
+	@kind delete cluster --name cnpg-test 2>/dev/null || true
+	@rm -rf /tmp/ocm-test-templates
+	@echo "✓ Test cleanup complete"

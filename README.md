@@ -140,6 +140,8 @@ See [CLAUDE.md](CLAUDE.md) for detailed development information including:
 
 ## Make Targets
 
+### Build Targets
+
 ```bash
 make help              # Show all available targets
 make build             # Build OCM component archive
@@ -151,6 +153,20 @@ make clean             # Clean build artifacts
 make info              # Show build configuration
 make all               # Clean, build, and validate
 ```
+
+### Test Targets
+
+```bash
+make test              # Run complete test suite (requires Docker, KIND, kubectl)
+make test-quick        # Run quick tests (no Kubernetes required)
+make test-component    # Test component build and structure
+make test-templates    # Validate all configuration templates
+make test-kind         # Run Kubernetes tests in KIND cluster
+make test-kind-keep    # Run tests and keep cluster for debugging
+make test-clean        # Clean up test resources
+```
+
+See [test/README.md](test/README.md) for detailed testing documentation.
 
 ## License
 

@@ -42,7 +42,8 @@ spec:
   # Storage configuration
   storage:
     size: ${STORAGE_SIZE:-10Gi}
-    ${STORAGE_CLASS:+storageClass: ${STORAGE_CLASS}}
+    # Uncomment to specify a custom StorageClass
+    # storageClass: ${STORAGE_CLASS}
 
   # Resource limits and requests
   resources:
