@@ -1,0 +1,21 @@
+# OCM build artifacts
+build/
+*.ctf
+*.tgz
+
+# Temporary files
+*.tmp
+*.swp
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.iml
+
+# Downloaded resources
+resources/downloaded/

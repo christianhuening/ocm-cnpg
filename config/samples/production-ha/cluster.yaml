@@ -1,0 +1,188 @@
+---
+# Production-Ready High Availability PostgreSQL Cluster
+# 3 instances, S3 backups, monitoring, and full production settings.
+
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: pg-production
+  namespace: production
+  labels:
+    environment: production
+    app: myapp
+spec:
+  instances: 3
+  minSyncReplicas: 1
+  maxSyncReplicas: 2
+
+  imageName: ghcr.io/cloudnative-pg/postgresql:16
+
+  primaryUpdateStrategy: unsupervised
+  primaryUpdateMethod: switchover
+
+  bootstrap:
+    initdb:
+      database: myapp
+      owner: myapp
+      secret:
+        name: pg-production-app-user
+      postInitSQL:
+        - CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+        - CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+  storage:
+    size: 100Gi
+    storageClass: fast-ssd
+
+  walStorage:
+    size: 20Gi
+    storageClass: fast-ssd
+
+  resources:
+    requests:
+      cpu: 2000m
+      memory: 4Gi
+    limits:
+      cpu: 4000m
+      memory: 8Gi
+
+  affinity:
+    enablePodAntiAffinity: true
+    topologyKey: kubernetes.io/hostname
+    podAntiAffinityType: required
+
+  postgresql:
+    parameters:
+      max_connections: "300"
+      shared_buffers: "1GB"
+      effective_cache_size: "3GB"
+      work_mem: "16MB"
+      maintenance_work_mem: "512MB"
+      wal_buffers: "16MB"
+      max_wal_size: "4GB"
+      min_wal_size: "1GB"
+      checkpoint_completion_target: "0.9"
+      random_page_cost: "1.1"
+      effective_io_concurrency: "200"
+      shared_preload_libraries: "pg_stat_statements"
+      pg_stat_statements.max: "10000"
+      pg_stat_statements.track: "all"
+      log_min_duration_statement: "1000"
+      log_checkpoints: "on"
+      log_connections: "on"
+      log_disconnections: "on"
+      log_lock_waits: "on"
+
+  # Backups to S3
+  backup:
+    barmanObjectStore:
+      destinationPath: s3://my-backup-bucket/postgresql/production
+      s3Credentials:
+        accessKeyId:
+          name: s3-backup-credentials
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: s3-backup-credentials
+          key: ACCESS_SECRET_KEY
+        region:
+          name: s3-backup-credentials
+          key: REGION
+      wal:
+        compression: gzip
+        encryption: AES256
+        maxParallel: 2
+      data:
+        compression: gzip
+        encryption: AES256
+        jobs: 2
+      retentionPolicy: "30d"
+      tags:
+        environment: production
+        cluster: pg-production
+
+  # Monitoring
+  monitoring:
+    enablePodMonitor: true
+    customQueriesConfigMap:
+      - name: cnpg-monitoring-queries
+        key: queries
+
+  # Managed roles
+  managed:
+    roles:
+      - name: readonly
+        ensure: present
+        login: true
+        connectionLimit: 50
+        passwordSecret:
+          name: pg-production-readonly-user
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: s3-backup-credentials
+  namespace: production
+type: Opaque
+stringData:
+  ACCESS_KEY_ID: "YOUR_ACCESS_KEY"
+  ACCESS_SECRET_KEY: "YOUR_SECRET_KEY"
+  REGION: "us-east-1"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pg-production-app-user
+  namespace: production
+type: kubernetes.io/basic-auth
+stringData:
+  username: myapp
+  password: "CHANGE_ME_STRONG_PASSWORD"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pg-production-readonly-user
+  namespace: production
+type: kubernetes.io/basic-auth
+stringData:
+  username: readonly
+  password: "CHANGE_ME_READONLY_PASSWORD"
+
+---
+# Scheduled Daily Backup
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: pg-production-daily
+  namespace: production
+spec:
+  schedule: "0 2 * * *"  # 2 AM daily
+  cluster:
+    name: pg-production
+  method: barmanObjectStore
+
+---
+# Custom Monitoring Queries
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cnpg-monitoring-queries
+  namespace: production
+data:
+  queries: |
+    cache_hit_ratio:
+      query: |
+        SELECT
+          datname AS database,
+          blks_hit::float / NULLIF(blks_hit + blks_read, 0) * 100 AS cache_hit_ratio
+        FROM pg_stat_database
+        WHERE datname NOT IN ('template0', 'template1')
+      metrics:
+        - database:
+            usage: "LABEL"
+        - cache_hit_ratio:
+            usage: "GAUGE"
+            description: "Cache hit ratio percentage"

@@ -1,0 +1,213 @@
+---
+components:
+  - name: ${COMPONENT_NAME}
+    version: ${CNPG_VERSION}
+    provider:
+      name: ${PROVIDER_NAME}
+
+    labels:
+      - name: "org.opencontainers.image.source"
+        value: "https://github.com/cloudnative-pg/cloudnative-pg"
+      - name: "org.opencontainers.image.documentation"
+        value: "https://cloudnative-pg.io/documentation/"
+      - name: "cnpg.io/operator-version"
+        value: ${CNPG_VERSION}
+      - name: "ocm.software/package-type"
+        value: "kubernetes-operator"
+
+    resources:
+      # ============================================
+      # CloudNativePG Operator Image
+      # ============================================
+      - name: cloudnative-pg-operator
+        type: ociImage
+        version: ${CNPG_VERSION}
+        relation: external
+        access:
+          type: ociArtifact
+          imageReference: ghcr.io/cloudnative-pg/cloudnative-pg:${CNPG_VERSION}
+        labels:
+          - name: "architecture.ocm.io/platforms"
+            value: "linux/amd64,linux/arm64,linux/ppc64le,linux/s390x"
+          - name: "cnpg.io/component-type"
+            value: "operator"
+
+      # ============================================
+      # PostgreSQL 17 Images
+      # ============================================
+      - name: postgresql-17
+        type: ociImage
+        version: ${PG_VERSION_17}
+        relation: external
+        access:
+          type: ociArtifact
+          imageReference: ghcr.io/cloudnative-pg/postgresql:${PG_VERSION_17}
+        labels:
+          - name: "architecture.ocm.io/platforms"
+            value: "linux/amd64,linux/arm64,linux/ppc64le,linux/s390x"
+          - name: "cnpg.io/component-type"
+            value: "postgresql"
+          - name: "cnpg.io/postgresql-major-version"
+            value: "17"
+
+      # ============================================
+      # PostgreSQL 16 Images
+      # ============================================
+      - name: postgresql-16
+        type: ociImage
+        version: ${PG_VERSION_16}
+        relation: external
+        access:
+          type: ociArtifact
+          imageReference: ghcr.io/cloudnative-pg/postgresql:${PG_VERSION_16}
+        labels:
+          - name: "architecture.ocm.io/platforms"
+            value: "linux/amd64,linux/arm64,linux/ppc64le,linux/s390x"
+          - name: "cnpg.io/component-type"
+            value: "postgresql"
+          - name: "cnpg.io/postgresql-major-version"
+            value: "16"
+          - name: "cnpg.io/default-version"
+            value: "true"
+
+      # ============================================
+      # PostgreSQL 15 Images
+      # ============================================
+      - name: postgresql-15
+        type: ociImage
+        version: ${PG_VERSION_15}
+        relation: external
+        access:
+          type: ociArtifact
+          imageReference: ghcr.io/cloudnative-pg/postgresql:${PG_VERSION_15}
+        labels:
+          - name: "architecture.ocm.io/platforms"
+            value: "linux/amd64,linux/arm64,linux/ppc64le,linux/s390x"
+          - name: "cnpg.io/component-type"
+            value: "postgresql"
+          - name: "cnpg.io/postgresql-major-version"
+            value: "15"
+
+      # ============================================
+      # PostgreSQL 14 Images
+      # ============================================
+      - name: postgresql-14
+        type: ociImage
+        version: ${PG_VERSION_14}
+        relation: external
+        access:
+          type: ociArtifact
+          imageReference: ghcr.io/cloudnative-pg/postgresql:${PG_VERSION_14}
+        labels:
+          - name: "architecture.ocm.io/platforms"
+            value: "linux/amd64,linux/arm64,linux/ppc64le,linux/s390x"
+          - name: "cnpg.io/component-type"
+            value: "postgresql"
+          - name: "cnpg.io/postgresql-major-version"
+            value: "14"
+
+      # ============================================
+      # Configuration Templates
+      # ============================================
+
+      # Operator Configuration
+      - name: operator-configmap
+        type: yaml
+        version: ${CNPG_VERSION}
+        relation: local
+        input:
+          type: file
+          path: ./config/operator/operator-configmap.yaml
+        labels:
+          - name: "cnpg.io/config-type"
+            value: "operator"
+
+      - name: monitoring-queries
+        type: yaml
+        version: ${CNPG_VERSION}
+        relation: local
+        input:
+          type: file
+          path: ./config/operator/monitoring-queries.yaml
+        labels:
+          - name: "cnpg.io/config-type"
+            value: "monitoring"
+
+      # Cluster Configuration Templates
+      - name: cluster-basic
+        type: yaml
+        version: ${CNPG_VERSION}
+        relation: local
+        input:
+          type: file
+          path: ./config/cluster/basic-cluster.yaml
+        labels:
+          - name: "cnpg.io/config-type"
+            value: "cluster"
+          - name: "cnpg.io/template-profile"
+            value: "basic"
+
+      - name: cluster-ha
+        type: yaml
+        version: ${CNPG_VERSION}
+        relation: local
+        input:
+          type: file
+          path: ./config/cluster/ha-cluster.yaml
+        labels:
+          - name: "cnpg.io/config-type"
+            value: "cluster"
+          - name: "cnpg.io/template-profile"
+            value: "high-availability"
+
+      - name: cluster-backup-s3
+        type: yaml
+        version: ${CNPG_VERSION}
+        relation: local
+        input:
+          type: file
+          path: ./config/cluster/backup-s3.yaml
+        labels:
+          - name: "cnpg.io/config-type"
+            value: "cluster"
+          - name: "cnpg.io/template-profile"
+            value: "backup-s3"
+
+      - name: cluster-backup-gcs
+        type: yaml
+        version: ${CNPG_VERSION}
+        relation: local
+        input:
+          type: file
+          path: ./config/cluster/backup-gcs.yaml
+        labels:
+          - name: "cnpg.io/config-type"
+            value: "cluster"
+          - name: "cnpg.io/template-profile"
+            value: "backup-gcs"
+
+      - name: cluster-backup-azure
+        type: yaml
+        version: ${CNPG_VERSION}
+        relation: local
+        input:
+          type: file
+          path: ./config/cluster/backup-azure.yaml
+        labels:
+          - name: "cnpg.io/config-type"
+            value: "cluster"
+          - name: "cnpg.io/template-profile"
+            value: "backup-azure"
+
+      - name: cluster-monitoring
+        type: yaml
+        version: ${CNPG_VERSION}
+        relation: local
+        input:
+          type: file
+          path: ./config/cluster/monitoring.yaml
+        labels:
+          - name: "cnpg.io/config-type"
+            value: "cluster"
+          - name: "cnpg.io/template-profile"
+            value: "monitoring"

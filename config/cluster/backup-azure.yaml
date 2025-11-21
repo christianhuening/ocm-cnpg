@@ -1,0 +1,123 @@
+---
+# PostgreSQL Cluster with Azure Blob Storage Backup
+# Includes scheduled backups to Azure Blob Storage and WAL archiving.
+#
+# Prerequisites:
+#   - Azure Storage Account created
+#   - Blob container created
+#   - Storage account credentials stored in Kubernetes Secret
+#
+# Variables:
+#   CLUSTER_NAME: Name of the cluster
+#   BACKUP_AZURE_CONTAINER: Azure container name (required)
+#   BACKUP_AZURE_ACCOUNT: Azure storage account name (required)
+#   BACKUP_AZURE_PATH: Path within container (default: /pg-backups)
+#   BACKUP_RETENTION_POLICY: Retention policy (default: 30d)
+
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: ${CLUSTER_NAME:-pg-azure-cluster}
+  namespace: ${CLUSTER_NAMESPACE:-default}
+
+spec:
+  instances: ${INSTANCES:-3}
+  imageName: ghcr.io/cloudnative-pg/postgresql:${POSTGRES_VERSION:-16}
+
+  bootstrap:
+    initdb:
+      database: ${DATABASE_NAME:-app}
+      owner: ${DATABASE_OWNER:-app}
+      secret:
+        name: ${CLUSTER_NAME:-pg-azure-cluster}-app-user
+
+  storage:
+    size: ${STORAGE_SIZE:-50Gi}
+    storageClass: ${STORAGE_CLASS}
+
+  resources:
+    requests:
+      cpu: ${CPU_REQUEST:-1000m}
+      memory: ${MEMORY_REQUEST:-2Gi}
+    limits:
+      cpu: ${CPU_LIMIT:-2000m}
+      memory: ${MEMORY_LIMIT:-4Gi}
+
+  # Backup configuration for Azure Blob Storage
+  backup:
+    barmanObjectStore:
+      # Azure destination path
+      destinationPath: https://${BACKUP_AZURE_ACCOUNT}.blob.core.windows.net/${BACKUP_AZURE_CONTAINER}${BACKUP_AZURE_PATH:-/pg-backups}
+
+      # Azure credentials from Secret
+      azureCredentials:
+        storageAccount:
+          name: ${BACKUP_SECRET_NAME:-azure-backup-credentials}
+          key: STORAGE_ACCOUNT
+        storageKey:
+          name: ${BACKUP_SECRET_NAME:-azure-backup-credentials}
+          key: STORAGE_KEY
+        # OR use SAS token:
+        # storageSasToken:
+        #   name: ${BACKUP_SECRET_NAME:-azure-backup-credentials}
+        #   key: STORAGE_SAS_TOKEN
+
+      # WAL archive configuration
+      wal:
+        compression: ${WAL_COMPRESSION:-gzip}
+        maxParallel: ${WAL_MAX_PARALLEL:-2}
+
+      # Data backup configuration
+      data:
+        compression: ${DATA_COMPRESSION:-gzip}
+        jobs: ${DATA_BACKUP_JOBS:-2}
+        immediateCheckpoint: ${IMMEDIATE_CHECKPOINT:-true}
+
+      # Retention policy
+      retentionPolicy: ${BACKUP_RETENTION_POLICY:-30d}
+
+      # Tags for backup objects
+      tags:
+        cluster: ${CLUSTER_NAME:-pg-azure-cluster}
+        environment: ${ENVIRONMENT:-production}
+
+---
+# Azure Credentials Secret
+# Create this secret with your Azure storage credentials.
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ${BACKUP_SECRET_NAME:-azure-backup-credentials}
+  namespace: ${CLUSTER_NAMESPACE:-default}
+type: Opaque
+stringData:
+  STORAGE_ACCOUNT: ${BACKUP_AZURE_ACCOUNT}
+  STORAGE_KEY: ${AZURE_STORAGE_KEY}
+  # OR use SAS token:
+  # STORAGE_SAS_TOKEN: ${AZURE_SAS_TOKEN}
+
+---
+# Scheduled Backup
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: ${CLUSTER_NAME:-pg-azure-cluster}-daily
+  namespace: ${CLUSTER_NAMESPACE:-default}
+spec:
+  schedule: ${BACKUP_SCHEDULE:-0 2 * * *}
+  cluster:
+    name: ${CLUSTER_NAME:-pg-azure-cluster}
+  method: barmanObjectStore
+
+---
+# Application user secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ${CLUSTER_NAME:-pg-azure-cluster}-app-user
+  namespace: ${CLUSTER_NAMESPACE:-default}
+type: kubernetes.io/basic-auth
+stringData:
+  username: ${DATABASE_OWNER:-app}
+  password: ${DATABASE_PASSWORD}

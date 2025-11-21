@@ -1,0 +1,42 @@
+---
+# Minimal PostgreSQL Cluster for Development
+# Single instance, minimal resources, no backups.
+
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: pg-dev
+  namespace: default
+spec:
+  instances: 1
+
+  imageName: ghcr.io/cloudnative-pg/postgresql:16
+
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+      secret:
+        name: pg-dev-app-user
+
+  storage:
+    size: 5Gi
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pg-dev-app-user
+  namespace: default
+type: kubernetes.io/basic-auth
+stringData:
+  username: app
+  password: devpassword123

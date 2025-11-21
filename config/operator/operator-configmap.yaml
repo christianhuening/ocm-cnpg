@@ -1,0 +1,133 @@
+---
+# CloudNativePG Operator ConfigMap
+# This ConfigMap configures the CloudNativePG operator behavior.
+# All settings are optional and will use operator defaults if not specified.
+#
+# Apply this ConfigMap before deploying the operator:
+#   kubectl apply -f operator-configmap.yaml
+#
+# Then reference it in the operator deployment environment variables.
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cnpg-controller-manager-config
+  namespace: ${OPERATOR_NAMESPACE:-cnpg-system}
+  labels:
+    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/component: operator-config
+
+data:
+  # ============================================
+  # Certificate Management
+  # ============================================
+
+  # Duration in days for certificates before they expire
+  # Default: 90
+  CERTIFICATE_DURATION: "${CERTIFICATE_DURATION:-90}"
+
+  # Number of days before expiration to flag certificates as expiring
+  # Default: 7
+  EXPIRING_CHECK_THRESHOLD: "${EXPIRING_CHECK_THRESHOLD:-7}"
+
+  # ============================================
+  # Upgrade Control
+  # ============================================
+
+  # Number of seconds to wait between cluster upgrades
+  # Useful to avoid overwhelming the infrastructure during mass upgrades
+  # Default: 0 (no delay)
+  CLUSTERS_ROLLOUT_DELAY: "${CLUSTERS_ROLLOUT_DELAY:-0}"
+
+  # Number of seconds to wait between instance upgrades within a cluster
+  # Default: 0 (no delay)
+  INSTANCES_ROLLOUT_DELAY: "${INSTANCES_ROLLOUT_DELAY:-0}"
+
+  # ============================================
+  # Image Configuration
+  # ============================================
+
+  # Default PostgreSQL image for new clusters
+  # If not set, uses the operator's default
+  POSTGRES_IMAGE_NAME: "${POSTGRES_IMAGE_NAME:-ghcr.io/cloudnative-pg/postgresql:16}"
+
+  # Operator image used for pod bootstrapping
+  # If not set, uses the image from the operator deployment
+  OPERATOR_IMAGE_NAME: "${OPERATOR_IMAGE_NAME}"
+
+  # ============================================
+  # Registry Configuration
+  # ============================================
+
+  # Name of the pull secret for additional registries
+  # The secret must exist in the same namespace as the Cluster resource
+  PULL_SECRET_NAME: "${PULL_SECRET_NAME}"
+
+  # ============================================
+  # Service Configuration
+  # ============================================
+
+  # Enable creation of the -any service pointing to all instances
+  # Default: false (disabled)
+  CREATE_ANY_SERVICE: "${CREATE_ANY_SERVICE:-false}"
+
+  # Kubernetes cluster domain for service FQDNs
+  # Default: cluster.local
+  KUBERNETES_CLUSTER_DOMAIN: "${KUBERNETES_CLUSTER_DOMAIN:-cluster.local}"
+
+  # ============================================
+  # Operator Behavior
+  # ============================================
+
+  # Enable in-place updates of the instance manager
+  # When enabled, operator upgrades don't trigger rolling updates of PostgreSQL pods
+  # Default: false
+  ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES: "${ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES:-false}"
+
+  # ============================================
+  # Monitoring Configuration
+  # ============================================
+
+  # Name of ConfigMap containing default monitoring queries
+  # Applied to all clusters unless overridden
+  MONITORING_QUERIES_CONFIGMAP: "${MONITORING_QUERIES_CONFIGMAP}"
+
+  # Name of Secret containing default monitoring queries
+  # Applied to all clusters unless overridden
+  MONITORING_QUERIES_SECRET: "${MONITORING_QUERIES_SECRET}"
+
+  # ============================================
+  # Resource Inheritance
+  # ============================================
+
+  # Comma-separated list of annotation keys to inherit from Cluster to managed resources
+  # Example: "example.com/annotation1,example.com/annotation2"
+  INHERITED_ANNOTATIONS: "${INHERITED_ANNOTATIONS}"
+
+  # Comma-separated list of label keys to inherit from Cluster to managed resources
+  # Example: "example.com/label1,example.com/label2"
+  INHERITED_LABELS: "${INHERITED_LABELS}"
+
+  # ============================================
+  # Networking
+  # ============================================
+
+  # TCP timeout for standby replication connections
+  # Default: 0 (system default)
+  STANDBY_TCP_USER_TIMEOUT: "${STANDBY_TCP_USER_TIMEOUT:-0}"
+
+  # ============================================
+  # Node Management
+  # ============================================
+
+  # Comma-separated list of taint keys indicating node drain status
+  # Example: "node.kubernetes.io/unschedulable,custom.io/draining"
+  DRAIN_TAINTS: "${DRAIN_TAINTS}"
+
+  # ============================================
+  # Plugin Configuration
+  # ============================================
+
+  # Comma-separated list of plugins to always include during reconciliation
+  # Example: "plugin1.so,plugin2.so"
+  INCLUDE_PLUGINS: "${INCLUDE_PLUGINS}"

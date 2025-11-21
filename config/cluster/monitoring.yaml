@@ -1,0 +1,260 @@
+---
+# PostgreSQL Cluster with Full Monitoring Configuration
+# Includes Prometheus PodMonitor, custom queries, and detailed logging.
+#
+# Prerequisites:
+#   - Prometheus Operator installed in cluster
+#   - ServiceMonitor or PodMonitor CRDs available
+#
+# Variables:
+#   CLUSTER_NAME: Name of the cluster
+#   ENABLE_POD_MONITOR: Enable PodMonitor (default: true)
+#   METRICS_PORT: Metrics port (default: 9187)
+
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: ${CLUSTER_NAME:-pg-monitoring-cluster}
+  namespace: ${CLUSTER_NAMESPACE:-default}
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/instance: ${CLUSTER_NAME:-pg-monitoring-cluster}
+    monitoring: enabled
+
+spec:
+  instances: ${INSTANCES:-3}
+  imageName: ghcr.io/cloudnative-pg/postgresql:${POSTGRES_VERSION:-16}
+
+  bootstrap:
+    initdb:
+      database: ${DATABASE_NAME:-app}
+      owner: ${DATABASE_OWNER:-app}
+      secret:
+        name: ${CLUSTER_NAME:-pg-monitoring-cluster}-app-user
+      postInitSQL:
+        # Enable monitoring extensions
+        - CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+        - CREATE EXTENSION IF NOT EXISTS pg_stat_kcache;
+
+  storage:
+    size: ${STORAGE_SIZE:-20Gi}
+    storageClass: ${STORAGE_CLASS}
+
+  resources:
+    requests:
+      cpu: ${CPU_REQUEST:-1000m}
+      memory: ${MEMORY_REQUEST:-2Gi}
+    limits:
+      cpu: ${CPU_LIMIT:-2000m}
+      memory: ${MEMORY_LIMIT:-4Gi}
+
+  # PostgreSQL configuration for monitoring
+  postgresql:
+    parameters:
+      # Enable query statistics
+      shared_preload_libraries: "pg_stat_statements"
+      pg_stat_statements.max: "${PG_STAT_STATEMENTS_MAX:-10000}"
+      pg_stat_statements.track: "all"
+      pg_stat_statements.track_utility: "on"
+
+      # Enable detailed logging for monitoring
+      log_min_duration_statement: "${LOG_MIN_DURATION_STATEMENT:-1000}"
+      log_checkpoints: "on"
+      log_connections: "on"
+      log_disconnections: "on"
+      log_duration: "off"
+      log_lock_waits: "on"
+      log_statement: "ddl"
+      log_temp_files: "0"
+      log_autovacuum_min_duration: "0"
+
+      # Performance monitoring
+      track_activities: "on"
+      track_counts: "on"
+      track_io_timing: "on"
+      track_functions: "all"
+
+  # Monitoring configuration
+  monitoring:
+    # Enable Prometheus PodMonitor
+    enablePodMonitor: ${ENABLE_POD_MONITOR:-true}
+
+    # Custom monitoring queries
+    customQueriesConfigMap:
+      - name: ${CUSTOM_QUERIES_CONFIGMAP:-cnpg-monitoring-queries}
+        key: queries
+
+    # Custom monitoring secret (for queries with sensitive data)
+    ${CUSTOM_QUERIES_SECRET:+customQueriesSecret:}
+    ${CUSTOM_QUERIES_SECRET:+  - name: ${CUSTOM_QUERIES_SECRET}}
+    ${CUSTOM_QUERIES_SECRET:+    key: queries}
+
+---
+# Custom Monitoring Queries ConfigMap
+# Additional metrics beyond the built-in ones.
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ${CUSTOM_QUERIES_CONFIGMAP:-cnpg-monitoring-queries}
+  namespace: ${CLUSTER_NAMESPACE:-default}
+data:
+  queries: |
+    # Top 10 slowest queries
+    slow_queries:
+      query: |
+        SELECT
+          userid::regrole AS user,
+          dbid::regclass AS database,
+          substring(query, 1, 100) AS query_sample,
+          calls,
+          mean_exec_time,
+          total_exec_time
+        FROM pg_stat_statements
+        WHERE calls > 0
+        ORDER BY mean_exec_time DESC
+        LIMIT 10
+      metrics:
+        - user:
+            usage: "LABEL"
+            description: "User executing the query"
+        - database:
+            usage: "LABEL"
+            description: "Database name"
+        - query_sample:
+            usage: "LABEL"
+            description: "Query text sample"
+        - calls:
+            usage: "COUNTER"
+            description: "Number of times executed"
+        - mean_exec_time:
+            usage: "GAUGE"
+            description: "Mean execution time in ms"
+        - total_exec_time:
+            usage: "COUNTER"
+            description: "Total execution time in ms"
+
+    # Cache hit ratio
+    cache_hit_ratio:
+      query: |
+        SELECT
+          datname AS database,
+          blks_hit::float / NULLIF(blks_hit + blks_read, 0) * 100 AS cache_hit_ratio
+        FROM pg_stat_database
+        WHERE datname NOT IN ('template0', 'template1')
+      metrics:
+        - database:
+            usage: "LABEL"
+            description: "Database name"
+        - cache_hit_ratio:
+            usage: "GAUGE"
+            description: "Cache hit ratio percentage"
+
+    # Index usage
+    index_usage:
+      query: |
+        SELECT
+          schemaname,
+          tablename,
+          indexname,
+          idx_scan,
+          idx_tup_read,
+          idx_tup_fetch
+        FROM pg_stat_user_indexes
+        WHERE idx_scan > 0
+      metrics:
+        - schemaname:
+            usage: "LABEL"
+            description: "Schema name"
+        - tablename:
+            usage: "LABEL"
+            description: "Table name"
+        - indexname:
+            usage: "LABEL"
+            description: "Index name"
+        - idx_scan:
+            usage: "COUNTER"
+            description: "Number of index scans"
+        - idx_tup_read:
+            usage: "COUNTER"
+            description: "Number of tuples read from index"
+        - idx_tup_fetch:
+            usage: "COUNTER"
+            description: "Number of tuples fetched"
+
+    # Vacuum progress
+    vacuum_progress:
+      query: |
+        SELECT
+          datname AS database,
+          relid::regclass AS table_name,
+          phase,
+          heap_blks_total,
+          heap_blks_scanned,
+          heap_blks_vacuumed,
+          index_vacuum_count,
+          max_dead_tuples,
+          num_dead_tuples
+        FROM pg_stat_progress_vacuum
+        JOIN pg_database ON pg_stat_progress_vacuum.datid = pg_database.oid
+      metrics:
+        - database:
+            usage: "LABEL"
+            description: "Database name"
+        - table_name:
+            usage: "LABEL"
+            description: "Table being vacuumed"
+        - phase:
+            usage: "LABEL"
+            description: "Current vacuum phase"
+        - heap_blks_total:
+            usage: "GAUGE"
+            description: "Total heap blocks"
+        - heap_blks_scanned:
+            usage: "GAUGE"
+            description: "Heap blocks scanned"
+        - heap_blks_vacuumed:
+            usage: "GAUGE"
+            description: "Heap blocks vacuumed"
+        - num_dead_tuples:
+            usage: "GAUGE"
+            description: "Number of dead tuples"
+
+    # Replication slots
+    replication_slots:
+      query: |
+        SELECT
+          slot_name,
+          slot_type,
+          database,
+          active,
+          pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn) AS replication_lag_bytes
+        FROM pg_replication_slots
+      metrics:
+        - slot_name:
+            usage: "LABEL"
+            description: "Replication slot name"
+        - slot_type:
+            usage: "LABEL"
+            description: "Slot type"
+        - database:
+            usage: "LABEL"
+            description: "Database name"
+        - active:
+            usage: "GAUGE"
+            description: "Is slot active (1=yes, 0=no)"
+        - replication_lag_bytes:
+            usage: "GAUGE"
+            description: "Replication lag in bytes"
+
+---
+# Application user secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ${CLUSTER_NAME:-pg-monitoring-cluster}-app-user
+  namespace: ${CLUSTER_NAMESPACE:-default}
+type: kubernetes.io/basic-auth
+stringData:
+  username: ${DATABASE_OWNER:-app}
+  password: ${DATABASE_PASSWORD}
