@@ -5,6 +5,11 @@ OCM_REPO ?= ghcr.io/ocm/ocm-cnpg
 COMPONENT_NAME ?= ocm.software/cloudnative-pg
 PROVIDER_NAME ?= ocm.software
 
+# Image Registry Configuration
+# Override these to pull images from private registries
+OPERATOR_REGISTRY ?= ghcr.io/cloudnative-pg
+POSTGRESQL_REGISTRY ?= ghcr.io/cloudnative-pg
+
 # Versions - these should be overridden via settings.yaml or environment
 CNPG_VERSION ?= 1.24.1
 PG_VERSION_17 ?= 17.2
@@ -75,6 +80,8 @@ build: check-ocm ## Build OCM component archive
 			./component-constructor.yaml \
 			COMPONENT_NAME=$(COMPONENT_NAME) \
 			PROVIDER_NAME=$(PROVIDER_NAME) \
+			OPERATOR_REGISTRY=$(OPERATOR_REGISTRY) \
+			POSTGRESQL_REGISTRY=$(POSTGRESQL_REGISTRY) \
 			CNPG_VERSION=$(CNPG_VERSION) \
 			PG_VERSION_17=$(PG_VERSION_17) \
 			PG_VERSION_16=$(PG_VERSION_16) \
@@ -108,6 +115,10 @@ info: ## Show build configuration
 	@echo "  Component Name: $(COMPONENT_NAME)"
 	@echo "  Provider:       $(PROVIDER_NAME)"
 	@echo "  OCM Repository: $(OCM_REPO)"
+	@echo ""
+	@echo "Image Registries:"
+	@echo "  Operator:       $(OPERATOR_REGISTRY)"
+	@echo "  PostgreSQL:     $(POSTGRESQL_REGISTRY)"
 	@echo ""
 	@echo "Versions:"
 	@echo "  CNPG Operator:  $(CNPG_VERSION)"
@@ -148,15 +159,15 @@ verify-images: ## Verify that all referenced images exist and are accessible
 	@echo "Verifying image references..."
 	@echo ""
 	@echo "Operator image:"
-	@docker manifest inspect ghcr.io/cloudnative-pg/cloudnative-pg:$(CNPG_VERSION) > /dev/null 2>&1 && \
-		echo "  ✓ ghcr.io/cloudnative-pg/cloudnative-pg:$(CNPG_VERSION)" || \
-		echo "  ✗ ghcr.io/cloudnative-pg/cloudnative-pg:$(CNPG_VERSION) - NOT FOUND"
+	@docker manifest inspect $(OPERATOR_REGISTRY)/cloudnative-pg:$(CNPG_VERSION) > /dev/null 2>&1 && \
+		echo "  ✓ $(OPERATOR_REGISTRY)/cloudnative-pg:$(CNPG_VERSION)" || \
+		echo "  ✗ $(OPERATOR_REGISTRY)/cloudnative-pg:$(CNPG_VERSION) - NOT FOUND"
 	@echo ""
 	@echo "PostgreSQL images:"
 	@for version in 17 16 15 14; do \
-		docker manifest inspect ghcr.io/cloudnative-pg/postgresql:$$version > /dev/null 2>&1 && \
-			echo "  ✓ ghcr.io/cloudnative-pg/postgresql:$$version" || \
-			echo "  ✗ ghcr.io/cloudnative-pg/postgresql:$$version - NOT FOUND"; \
+		docker manifest inspect $(POSTGRESQL_REGISTRY)/postgresql:$$version > /dev/null 2>&1 && \
+			echo "  ✓ $(POSTGRESQL_REGISTRY)/postgresql:$$version" || \
+			echo "  ✗ $(POSTGRESQL_REGISTRY)/postgresql:$$version - NOT FOUND"; \
 	done
 	@echo ""
 	@echo "Image verification complete"
@@ -168,10 +179,10 @@ list-image-tags: ## List available tags for operator and PostgreSQL images
 	@echo ""
 	@if command -v crane > /dev/null 2>&1; then \
 		echo "CloudNativePG Operator tags (latest 10):"; \
-		crane ls ghcr.io/cloudnative-pg/cloudnative-pg | sort -V | tail -10; \
+		crane ls $(OPERATOR_REGISTRY)/cloudnative-pg | sort -V | tail -10; \
 		echo ""; \
 		echo "PostgreSQL tags (latest 10):"; \
-		crane ls ghcr.io/cloudnative-pg/postgresql | grep -E '^[0-9]+$$' | sort -V | tail -10; \
+		crane ls $(POSTGRESQL_REGISTRY)/postgresql | grep -E '^[0-9]+$$' | sort -V | tail -10; \
 	else \
 		echo "Please install crane to list remote tags"; \
 	fi

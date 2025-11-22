@@ -200,6 +200,16 @@ ocm add componentversions \
     CNPG_VERSION=1.27.0 \
     PG16_VERSION=16.8
 
+# Build with custom registries for private images
+ocm add componentversions \
+    --create \
+    --file ./build \
+    ./component-constructor.yaml \
+    OPERATOR_REGISTRY=my-registry.example.com/cloudnative-pg \
+    POSTGRESQL_REGISTRY=my-registry.example.com/postgresql \
+    CNPG_VERSION=1.27.0 \
+    PG16_VERSION=16.8
+
 # Examine component
 ocm get componentversions ./build -o yaml
 
@@ -215,3 +225,28 @@ Variables are resolved in this order:
 3. Command-line arguments
 
 This allows flexible override mechanisms for different deployment scenarios.
+
+### Private Registry Configuration
+
+To use images from private registries instead of the official ghcr.io repositories:
+
+**Option 1: Via settings.yaml**
+```yaml
+OPERATOR_REGISTRY: "my-registry.example.com/cloudnative-pg"
+POSTGRESQL_REGISTRY: "my-registry.example.com/postgresql"
+```
+
+**Option 2: Via environment variables**
+```bash
+export OPERATOR_REGISTRY=my-registry.example.com/cloudnative-pg
+export POSTGRESQL_REGISTRY=my-registry.example.com/postgresql
+make build
+```
+
+**Option 3: Via Makefile variables**
+```bash
+make build OPERATOR_REGISTRY=my-registry.example.com/cloudnative-pg \
+           POSTGRESQL_REGISTRY=my-registry.example.com/postgresql
+```
+
+The registries can be configured independently, allowing mixed scenarios where the operator comes from one registry and PostgreSQL images from another.
