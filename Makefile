@@ -124,6 +124,121 @@ all: clean build validate ## Clean, build and validate
 	@echo "Build complete!"
 
 # ============================================
+# Version Management
+# ============================================
+
+.PHONY: versions
+versions: ## Show supported versions from versions.yaml
+	@echo "Supported Versions:"
+	@echo ""
+	@if command -v yq > /dev/null 2>&1; then \
+		echo "CloudNativePG Operator:"; \
+		yq '.operator.supported[] | "  " + .version + " (" + .release_date + ") - " + .notes' versions.yaml; \
+		echo ""; \
+		echo "PostgreSQL:"; \
+		yq '.postgresql.versions[] | "  PostgreSQL " + .major + " (" + .full_version + ") - " + .notes' versions.yaml; \
+	else \
+		echo "  Install 'yq' for formatted output: brew install yq"; \
+		echo "  Raw version file:"; \
+		cat versions.yaml; \
+	fi
+
+.PHONY: verify-images
+verify-images: ## Verify that all referenced images exist and are accessible
+	@echo "Verifying image references..."
+	@echo ""
+	@echo "Operator image:"
+	@docker manifest inspect ghcr.io/cloudnative-pg/cloudnative-pg:$(CNPG_VERSION) > /dev/null 2>&1 && \
+		echo "  ✓ ghcr.io/cloudnative-pg/cloudnative-pg:$(CNPG_VERSION)" || \
+		echo "  ✗ ghcr.io/cloudnative-pg/cloudnative-pg:$(CNPG_VERSION) - NOT FOUND"
+	@echo ""
+	@echo "PostgreSQL images:"
+	@for version in 17 16 15 14; do \
+		docker manifest inspect ghcr.io/cloudnative-pg/postgresql:$$version > /dev/null 2>&1 && \
+			echo "  ✓ ghcr.io/cloudnative-pg/postgresql:$$version" || \
+			echo "  ✗ ghcr.io/cloudnative-pg/postgresql:$$version - NOT FOUND"; \
+	done
+	@echo ""
+	@echo "Image verification complete"
+
+.PHONY: list-image-tags
+list-image-tags: ## List available tags for operator and PostgreSQL images
+	@echo "This requires crane or skopeo. Install with:"
+	@echo "  brew install crane"
+	@echo ""
+	@if command -v crane > /dev/null 2>&1; then \
+		echo "CloudNativePG Operator tags (latest 10):"; \
+		crane ls ghcr.io/cloudnative-pg/cloudnative-pg | sort -V | tail -10; \
+		echo ""; \
+		echo "PostgreSQL tags (latest 10):"; \
+		crane ls ghcr.io/cloudnative-pg/postgresql | grep -E '^[0-9]+$$' | sort -V | tail -10; \
+	else \
+		echo "Please install crane to list remote tags"; \
+	fi
+
+# ============================================
+# Documentation Generation
+# ============================================
+
+.PHONY: docs
+docs: ## Generate documentation from component and configurations
+	@echo "Generating documentation..."
+	@mkdir -p docs/generated
+	@$(MAKE) docs-component
+	@$(MAKE) docs-config
+	@$(MAKE) docs-resources
+	@echo "Documentation generated in docs/generated/"
+
+.PHONY: docs-component
+docs-component: build ## Generate component descriptor documentation
+	@echo "Generating component documentation..."
+	@echo "# Component Descriptor" > docs/generated/component.md
+	@echo "" >> docs/generated/component.md
+	@echo "## Component Information" >> docs/generated/component.md
+	@echo "" >> docs/generated/component.md
+	@echo '```yaml' >> docs/generated/component.md
+	@$(OCM) get componentversions $(BUILD_DIR) -o yaml >> docs/generated/component.md
+	@echo '```' >> docs/generated/component.md
+	@echo "✓ Component documentation generated"
+
+.PHONY: docs-config
+docs-config: build ## Generate configuration template documentation
+	@echo "Generating configuration documentation..."
+	@mkdir -p docs/generated
+	@echo "# Configuration Templates" > docs/generated/templates.md
+	@echo "" >> docs/generated/templates.md
+	@echo "This document describes all available configuration templates included in the OCM component." >> docs/generated/templates.md
+	@echo "" >> docs/generated/templates.md
+	@for template in operator-configmap monitoring-queries cluster-basic cluster-ha cluster-backup-s3 cluster-backup-gcs cluster-backup-azure cluster-monitoring; do \
+		echo "## Template: $$template" >> docs/generated/templates.md; \
+		echo "" >> docs/generated/templates.md; \
+		echo '```yaml' >> docs/generated/templates.md; \
+		$(OCM) download resource $(BUILD_DIR) $$template 2>/dev/null >> docs/generated/templates.md || echo "Error extracting $$template" >> docs/generated/templates.md; \
+		echo '```' >> docs/generated/templates.md; \
+		echo "" >> docs/generated/templates.md; \
+	done
+	@echo "✓ Configuration documentation generated"
+
+.PHONY: docs-resources
+docs-resources: build ## Generate resource list documentation
+	@echo "Generating resource documentation..."
+	@echo "# OCM Resources" > docs/generated/resources.md
+	@echo "" >> docs/generated/resources.md
+	@echo "## Container Images" >> docs/generated/resources.md
+	@echo "" >> docs/generated/resources.md
+	@$(OCM) get resources $(BUILD_DIR) -o wide | grep -E "(NAME|ociImage)" >> docs/generated/resources.md || true
+	@echo "" >> docs/generated/resources.md
+	@echo "## Configuration Templates" >> docs/generated/resources.md
+	@echo "" >> docs/generated/resources.md
+	@$(OCM) get resources $(BUILD_DIR) -o wide | grep -E "(NAME|yaml)" >> docs/generated/resources.md || true
+	@echo "✓ Resource documentation generated"
+
+.PHONY: docs-clean
+docs-clean: ## Clean generated documentation
+	@rm -rf docs/generated
+	@echo "✓ Documentation cleaned"
+
+# ============================================
 # Testing targets
 # ============================================
 

@@ -1,0 +1,161 @@
+---
+# PostgreSQL Cluster with S3 Backup Configuration
+# Includes scheduled backups to S3-compatible object storage and WAL archiving.
+#
+# Prerequisites:
+#   - S3 bucket created and accessible
+#   - AWS credentials stored in a Kubernetes Secret
+#
+# Variables:
+#   CLUSTER_NAME: Name of the cluster
+#   BACKUP_S3_BUCKET: S3 bucket name (required)
+#   BACKUP_S3_PATH: Path within bucket (default: /pg-backups)
+#   BACKUP_S3_REGION: AWS region (default: us-east-1)
+#   BACKUP_S3_ENDPOINT: S3 endpoint URL (optional, for S3-compatible storage)
+#   BACKUP_RETENTION_POLICY: Retention policy (default: 30d)
+#   BACKUP_SCHEDULE: Cron schedule for backups (default: 0 2 * * *)
+
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: ${CLUSTER_NAME:-pg-backup-cluster}
+  namespace: ${CLUSTER_NAMESPACE:-default}
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/instance: ${CLUSTER_NAME:-pg-backup-cluster}
+
+spec:
+  instances: ${INSTANCES:-3}
+  imageName: ghcr.io/cloudnative-pg/postgresql:${POSTGRES_VERSION:-16}
+
+  bootstrap:
+    initdb:
+      database: ${DATABASE_NAME:-app}
+      owner: ${DATABASE_OWNER:-app}
+      secret:
+        name: ${CLUSTER_NAME:-pg-backup-cluster}-app-user
+
+  storage:
+    size: ${STORAGE_SIZE:-50Gi}
+    storageClass: ${STORAGE_CLASS}
+
+  resources:
+    requests:
+      cpu: ${CPU_REQUEST:-1000m}
+      memory: ${MEMORY_REQUEST:-2Gi}
+    limits:
+      cpu: ${CPU_LIMIT:-2000m}
+      memory: ${MEMORY_LIMIT:-4Gi}
+
+  # Backup configuration for S3
+  backup:
+    # Barman object store for S3
+    barmanObjectStore:
+      # S3 destination path
+      destinationPath: s3://${BACKUP_S3_BUCKET}${BACKUP_S3_PATH:-/pg-backups}
+
+      # S3 endpoint (for S3-compatible storage like MinIO, use custom endpoint)
+      ${BACKUP_S3_ENDPOINT:+endpointURL: ${BACKUP_S3_ENDPOINT}}
+
+      # S3 credentials from Secret
+      s3Credentials:
+        accessKeyId:
+          name: ${BACKUP_SECRET_NAME:-s3-backup-credentials}
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: ${BACKUP_SECRET_NAME:-s3-backup-credentials}
+          key: ACCESS_SECRET_KEY
+        region:
+          name: ${BACKUP_SECRET_NAME:-s3-backup-credentials}
+          key: REGION
+
+      # WAL archive configuration
+      wal:
+        compression: ${WAL_COMPRESSION:-gzip}
+        encryption: ${WAL_ENCRYPTION:-AES256}
+        maxParallel: ${WAL_MAX_PARALLEL:-2}
+
+      # Data backup configuration
+      data:
+        compression: ${DATA_COMPRESSION:-gzip}
+        encryption: ${DATA_ENCRYPTION:-AES256}
+        jobs: ${DATA_BACKUP_JOBS:-2}
+        immediateCheckpoint: ${IMMEDIATE_CHECKPOINT:-true}
+
+      # Retention policy
+      retentionPolicy: ${BACKUP_RETENTION_POLICY:-30d}
+
+      # Tags for backup objects
+      tags:
+        cluster: ${CLUSTER_NAME:-pg-backup-cluster}
+        environment: ${ENVIRONMENT:-production}
+        managed-by: cloudnative-pg
+
+    # Target for recovery (optional - for PITR)
+    ${RECOVERY_TARGET:+target: ${RECOVERY_TARGET}}
+
+  # External clusters for recovery (optional)
+  ${RECOVERY_CLUSTER:+externalClusters:}
+  ${RECOVERY_CLUSTER:+  - name: ${RECOVERY_CLUSTER}}
+  ${RECOVERY_CLUSTER:+    barmanObjectStore:}
+  ${RECOVERY_CLUSTER:+      destinationPath: s3://${BACKUP_S3_BUCKET}${BACKUP_S3_PATH:-/pg-backups}}
+  ${RECOVERY_CLUSTER:+      s3Credentials:}
+  ${RECOVERY_CLUSTER:+        accessKeyId:}
+  ${RECOVERY_CLUSTER:+          name: ${BACKUP_SECRET_NAME:-s3-backup-credentials}}
+  ${RECOVERY_CLUSTER:+          key: ACCESS_KEY_ID}
+  ${RECOVERY_CLUSTER:+        secretAccessKey:}
+  ${RECOVERY_CLUSTER:+          name: ${BACKUP_SECRET_NAME:-s3-backup-credentials}}
+  ${RECOVERY_CLUSTER:+          key: ACCESS_SECRET_KEY}
+
+---
+# S3 Credentials Secret
+# Create this secret with your S3 credentials before deploying the cluster.
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ${BACKUP_SECRET_NAME:-s3-backup-credentials}
+  namespace: ${CLUSTER_NAMESPACE:-default}
+type: Opaque
+stringData:
+  ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}  # Required
+  ACCESS_SECRET_KEY: ${AWS_SECRET_ACCESS_KEY}  # Required
+  REGION: ${BACKUP_S3_REGION:-us-east-1}
+
+---
+# Scheduled Backup
+# Creates backups according to the cron schedule.
+
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: ${CLUSTER_NAME:-pg-backup-cluster}-daily
+  namespace: ${CLUSTER_NAMESPACE:-default}
+spec:
+  # Cron schedule (default: 2 AM daily)
+  schedule: ${BACKUP_SCHEDULE:-0 2 * * *}
+
+  # Backup owner reference
+  cluster:
+    name: ${CLUSTER_NAME:-pg-backup-cluster}
+
+  # Backup method
+  method: ${BACKUP_METHOD:-barmanObjectStore}
+
+  # Immediate backup after creation
+  immediate: ${IMMEDIATE_BACKUP:-false}
+
+  # Suspend scheduling
+  suspend: ${SUSPEND_BACKUPS:-false}
+
+---
+# Application user secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ${CLUSTER_NAME:-pg-backup-cluster}-app-user
+  namespace: ${CLUSTER_NAMESPACE:-default}
+type: kubernetes.io/basic-auth
+stringData:
+  username: ${DATABASE_OWNER:-app}
+  password: ${DATABASE_PASSWORD}

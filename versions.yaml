@@ -1,0 +1,91 @@
+# Version Matrix for CloudNativePG OCM Component
+# This file defines supported versions for the operator and PostgreSQL images.
+# Update this file to add new versions or update existing ones.
+
+# CloudNativePG Operator versions
+operator:
+  # Latest stable version (used as default)
+  default: "1.24.1"
+
+  # All supported versions
+  supported:
+    - version: "1.24.1"
+      release_date: "2024-11-15"
+      kubernetes_versions: "1.26-1.31"
+      notes: "Latest stable release"
+
+    - version: "1.24.0"
+      release_date: "2024-10-28"
+      kubernetes_versions: "1.26-1.31"
+      notes: "Stable release"
+
+    - version: "1.23.3"
+      release_date: "2024-09-20"
+      kubernetes_versions: "1.25-1.30"
+      notes: "Previous stable"
+
+# PostgreSQL versions
+# Each major version tracks the latest minor release
+postgresql:
+  versions:
+    - major: "17"
+      image_tag: "17"
+      full_version: "17.2"
+      release_date: "2024-11-14"
+      eol_date: "2029-11-09"
+      notes: "Latest major version with improved performance"
+
+    - major: "16"
+      image_tag: "16"
+      full_version: "16.6"
+      release_date: "2024-11-14"
+      eol_date: "2028-11-09"
+      notes: "Current stable, recommended for production"
+
+    - major: "15"
+      image_tag: "15"
+      full_version: "15.10"
+      release_date: "2024-11-14"
+      eol_date: "2027-11-11"
+      notes: "Stable release"
+
+    - major: "14"
+      image_tag: "14"
+      full_version: "14.15"
+      release_date: "2024-11-14"
+      eol_date: "2026-11-12"
+      notes: "Long-term support"
+
+    - major: "13"
+      image_tag: "13"
+      full_version: "13.18"
+      release_date: "2024-11-14"
+      eol_date: "2025-11-13"
+      notes: "Approaching EOL - not recommended for new deployments"
+
+# Image sources
+images:
+  operator:
+    registry: "ghcr.io"
+    repository: "cloudnative-pg/cloudnative-pg"
+    # Full reference: ghcr.io/cloudnative-pg/cloudnative-pg:<version>
+
+  postgresql:
+    registry: "ghcr.io"
+    repository: "cloudnative-pg/postgresql"
+    # Full reference: ghcr.io/cloudnative-pg/postgresql:<major>
+
+  # Multi-architecture support
+  architectures:
+    - linux/amd64
+    - linux/arm64
+    - linux/ppc64le
+    - linux/s390x
+
+# Update policy
+update_policy:
+  check_frequency: "weekly"
+  auto_update_minor: false
+  auto_update_patch: true
+  notification_channels:
+    - github_issues

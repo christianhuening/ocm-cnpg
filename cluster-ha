@@ -1,0 +1,180 @@
+---
+# High Availability PostgreSQL Cluster
+# Production-ready configuration with multiple replicas, anti-affinity, and monitoring.
+#
+# Variables:
+#   CLUSTER_NAME: Name of the cluster (default: pg-ha-cluster)
+#   CLUSTER_NAMESPACE: Namespace for the cluster (default: default)
+#   INSTANCES: Number of PostgreSQL instances (default: 3)
+#   POSTGRES_VERSION: PostgreSQL image version (default: 16)
+#   STORAGE_SIZE: Storage size per instance (default: 50Gi)
+#   STORAGE_CLASS: StorageClass name (required for production)
+
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: ${CLUSTER_NAME:-pg-ha-cluster}
+  namespace: ${CLUSTER_NAMESPACE:-default}
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/instance: ${CLUSTER_NAME:-pg-ha-cluster}
+    app.kubernetes.io/managed-by: cloudnative-pg
+    environment: ${ENVIRONMENT:-production}
+
+spec:
+  # High availability: 3 instances (1 primary + 2 replicas)
+  instances: ${INSTANCES:-3}
+
+  # Minimum number of instances that should be in sync
+  minSyncReplicas: ${MIN_SYNC_REPLICAS:-1}
+  maxSyncReplicas: ${MAX_SYNC_REPLICAS:-2}
+
+  # PostgreSQL image
+  imageName: ghcr.io/cloudnative-pg/postgresql:${POSTGRES_VERSION:-16}
+
+  # Bootstrap configuration
+  bootstrap:
+    initdb:
+      database: ${DATABASE_NAME:-app}
+      owner: ${DATABASE_OWNER:-app}
+      secret:
+        name: ${CLUSTER_NAME:-pg-ha-cluster}-app-user
+      postInitSQL:
+        - CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+        - CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+  # Primary update strategy
+  primaryUpdateStrategy: unsupervised
+  primaryUpdateMethod: switchover
+
+  # Storage configuration
+  storage:
+    size: ${STORAGE_SIZE:-50Gi}
+    storageClass: ${STORAGE_CLASS}
+
+  # WAL storage (optional, for improved I/O performance)
+  # Uncomment and configure if you want separate WAL storage
+  # walStorage:
+  #   size: 20Gi
+  #   storageClass: fast-ssd
+
+  # Resource limits and requests (production-sized)
+  resources:
+    requests:
+      cpu: ${CPU_REQUEST:-2000m}
+      memory: ${MEMORY_REQUEST:-4Gi}
+    limits:
+      cpu: ${CPU_LIMIT:-4000m}
+      memory: ${MEMORY_LIMIT:-8Gi}
+
+  # Pod anti-affinity for high availability
+  affinity:
+    enablePodAntiAffinity: true
+    topologyKey: ${TOPOLOGY_KEY:-kubernetes.io/hostname}
+    podAntiAffinityType: ${ANTI_AFFINITY_TYPE:-required}
+
+  # PostgreSQL configuration for production
+  postgresql:
+    parameters:
+      # Connection settings
+      max_connections: "${MAX_CONNECTIONS:-200}"
+      superuser_reserved_connections: "${SUPERUSER_RESERVED_CONNECTIONS:-5}"
+
+      # Memory settings (tuned for 4-8Gi RAM)
+      shared_buffers: "${SHARED_BUFFERS:-1GB}"
+      effective_cache_size: "${EFFECTIVE_CACHE_SIZE:-3GB}"
+      work_mem: "${WORK_MEM:-16MB}"
+      maintenance_work_mem: "${MAINTENANCE_WORK_MEM:-512MB}"
+
+      # WAL settings for better performance
+      wal_buffers: "${WAL_BUFFERS:-16MB}"
+      max_wal_size: "${MAX_WAL_SIZE:-4GB}"
+      min_wal_size: "${MIN_WAL_SIZE:-1GB}"
+      wal_compression: "${WAL_COMPRESSION:-on}"
+
+      # Checkpoint settings
+      checkpoint_completion_target: "${CHECKPOINT_COMPLETION_TARGET:-0.9}"
+      checkpoint_timeout: "${CHECKPOINT_TIMEOUT:-15min}"
+
+      # Replication settings
+      max_replication_slots: "${MAX_REPLICATION_SLOTS:-10}"
+      max_wal_senders: "${MAX_WAL_SENDERS:-10}"
+      wal_keep_size: "${WAL_KEEP_SIZE:-512MB}"
+
+      # Query planner settings
+      random_page_cost: "${RANDOM_PAGE_COST:-1.1}"
+      effective_io_concurrency: "${EFFECTIVE_IO_CONCURRENCY:-200}"
+      default_statistics_target: "${DEFAULT_STATISTICS_TARGET:-100}"
+
+      # Autovacuum tuning
+      autovacuum_max_workers: "${AUTOVACUUM_MAX_WORKERS:-3}"
+      autovacuum_naptime: "${AUTOVACUUM_NAPTIME:-30s}"
+
+      # Query performance tracking
+      shared_preload_libraries: "pg_stat_statements"
+      pg_stat_statements.max: "${PG_STAT_STATEMENTS_MAX:-10000}"
+      pg_stat_statements.track: "all"
+
+      # Logging
+      log_destination: "csvlog"
+      logging_collector: "on"
+      log_directory: "/controller/log"
+      log_filename: "postgres"
+      log_rotation_age: "1d"
+      log_rotation_size: "100MB"
+      log_truncate_on_rotation: "false"
+      log_checkpoints: "on"
+      log_connections: "on"
+      log_disconnections: "on"
+      log_lock_waits: "on"
+      log_autovacuum_min_duration: "0"
+      log_min_duration_statement: "${LOG_MIN_DURATION_STATEMENT:-1000}"
+      log_statement: "${LOG_STATEMENT:-ddl}"
+      log_line_prefix: "%m [%p] %q%u@%d "
+
+  # Monitoring configuration
+  monitoring:
+    enablePodMonitor: ${ENABLE_MONITORING:-true}
+    # Uncomment to add custom monitoring queries
+    # customQueriesConfigMap:
+    #   - name: cnpg-monitoring-queries
+    #     key: queries
+
+  # Node maintenance window
+  nodeMaintenanceWindow:
+    inProgress: false
+    reusePVC: ${REUSE_PVC:-true}
+
+  # Managed roles
+  managed:
+    roles:
+      - name: ${READONLY_USER:-readonly}
+        ensure: present
+        login: true
+        connectionLimit: ${READONLY_CONNECTION_LIMIT:-50}
+        passwordSecret:
+          name: ${CLUSTER_NAME:-pg-ha-cluster}-readonly-user
+
+---
+# Application user secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ${CLUSTER_NAME:-pg-ha-cluster}-app-user
+  namespace: ${CLUSTER_NAMESPACE:-default}
+type: kubernetes.io/basic-auth
+stringData:
+  username: ${DATABASE_OWNER:-app}
+  password: ${DATABASE_PASSWORD}  # Required - set via environment or settings
+
+---
+# Read-only user secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ${CLUSTER_NAME:-pg-ha-cluster}-readonly-user
+  namespace: ${CLUSTER_NAMESPACE:-default}
+type: kubernetes.io/basic-auth
+stringData:
+  username: ${READONLY_USER:-readonly}
+  password: ${READONLY_PASSWORD}  # Required - set via environment or settings

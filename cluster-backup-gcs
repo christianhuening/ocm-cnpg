@@ -1,0 +1,114 @@
+---
+# PostgreSQL Cluster with Google Cloud Storage (GCS) Backup
+# Includes scheduled backups to GCS and WAL archiving.
+#
+# Prerequisites:
+#   - GCS bucket created
+#   - Service account with Storage Object Admin role
+#   - Service account key stored in Kubernetes Secret
+#
+# Variables:
+#   CLUSTER_NAME: Name of the cluster
+#   BACKUP_GCS_BUCKET: GCS bucket name (required)
+#   BACKUP_GCS_PATH: Path within bucket (default: /pg-backups)
+#   BACKUP_RETENTION_POLICY: Retention policy (default: 30d)
+
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: ${CLUSTER_NAME:-pg-gcs-cluster}
+  namespace: ${CLUSTER_NAMESPACE:-default}
+
+spec:
+  instances: ${INSTANCES:-3}
+  imageName: ghcr.io/cloudnative-pg/postgresql:${POSTGRES_VERSION:-16}
+
+  bootstrap:
+    initdb:
+      database: ${DATABASE_NAME:-app}
+      owner: ${DATABASE_OWNER:-app}
+      secret:
+        name: ${CLUSTER_NAME:-pg-gcs-cluster}-app-user
+
+  storage:
+    size: ${STORAGE_SIZE:-50Gi}
+    storageClass: ${STORAGE_CLASS}
+
+  resources:
+    requests:
+      cpu: ${CPU_REQUEST:-1000m}
+      memory: ${MEMORY_REQUEST:-2Gi}
+    limits:
+      cpu: ${CPU_LIMIT:-2000m}
+      memory: ${MEMORY_LIMIT:-4Gi}
+
+  # Backup configuration for GCS
+  backup:
+    barmanObjectStore:
+      # GCS destination path
+      destinationPath: gs://${BACKUP_GCS_BUCKET}${BACKUP_GCS_PATH:-/pg-backups}
+
+      # GCS credentials from Secret
+      googleCredentials:
+        applicationCredentials:
+          name: ${BACKUP_SECRET_NAME:-gcs-backup-credentials}
+          key: APPLICATION_CREDENTIALS
+
+      # WAL archive configuration
+      wal:
+        compression: ${WAL_COMPRESSION:-gzip}
+        maxParallel: ${WAL_MAX_PARALLEL:-2}
+
+      # Data backup configuration
+      data:
+        compression: ${DATA_COMPRESSION:-gzip}
+        jobs: ${DATA_BACKUP_JOBS:-2}
+        immediateCheckpoint: ${IMMEDIATE_CHECKPOINT:-true}
+
+      # Retention policy
+      retentionPolicy: ${BACKUP_RETENTION_POLICY:-30d}
+
+      # Tags for backup objects
+      tags:
+        cluster: ${CLUSTER_NAME:-pg-gcs-cluster}
+        environment: ${ENVIRONMENT:-production}
+
+---
+# GCS Credentials Secret
+# Create this secret with your GCS service account key.
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ${BACKUP_SECRET_NAME:-gcs-backup-credentials}
+  namespace: ${CLUSTER_NAMESPACE:-default}
+type: Opaque
+stringData:
+  # Service account JSON key file content
+  APPLICATION_CREDENTIALS: |
+    ${GCS_SERVICE_ACCOUNT_JSON}
+
+---
+# Scheduled Backup
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: ${CLUSTER_NAME:-pg-gcs-cluster}-daily
+  namespace: ${CLUSTER_NAMESPACE:-default}
+spec:
+  schedule: ${BACKUP_SCHEDULE:-0 2 * * *}
+  cluster:
+    name: ${CLUSTER_NAME:-pg-gcs-cluster}
+  method: barmanObjectStore
+
+---
+# Application user secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ${CLUSTER_NAME:-pg-gcs-cluster}-app-user
+  namespace: ${CLUSTER_NAMESPACE:-default}
+type: kubernetes.io/basic-auth
+stringData:
+  username: ${DATABASE_OWNER:-app}
+  password: ${DATABASE_PASSWORD}

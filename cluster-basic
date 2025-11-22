@@ -1,0 +1,111 @@
+---
+# Basic CloudNativePG Cluster
+# A minimal PostgreSQL cluster configuration for development or testing.
+#
+# Variables:
+#   CLUSTER_NAME: Name of the cluster (default: pg-cluster)
+#   CLUSTER_NAMESPACE: Namespace for the cluster (default: default)
+#   INSTANCES: Number of PostgreSQL instances (default: 1)
+#   POSTGRES_VERSION: PostgreSQL image version (default: 16)
+#   STORAGE_SIZE: Storage size per instance (default: 10Gi)
+#   STORAGE_CLASS: StorageClass name (optional)
+#   CPU_REQUEST: CPU request (default: 500m)
+#   CPU_LIMIT: CPU limit (default: 1000m)
+#   MEMORY_REQUEST: Memory request (default: 1Gi)
+#   MEMORY_LIMIT: Memory limit (default: 2Gi)
+
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: ${CLUSTER_NAME:-pg-cluster}
+  namespace: ${CLUSTER_NAMESPACE:-default}
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/instance: ${CLUSTER_NAME:-pg-cluster}
+    app.kubernetes.io/managed-by: cloudnative-pg
+
+spec:
+  # Number of PostgreSQL instances in the cluster
+  instances: ${INSTANCES:-1}
+
+  # PostgreSQL image
+  imageName: ghcr.io/cloudnative-pg/postgresql:${POSTGRES_VERSION:-16}
+
+  # Bootstrap configuration
+  bootstrap:
+    initdb:
+      database: ${DATABASE_NAME:-app}
+      owner: ${DATABASE_OWNER:-app}
+      secret:
+        name: ${CLUSTER_NAME:-pg-cluster}-app-user
+
+  # Storage configuration
+  storage:
+    size: ${STORAGE_SIZE:-10Gi}
+    # Uncomment to specify a custom StorageClass
+    # storageClass: ${STORAGE_CLASS}
+
+  # Resource limits and requests
+  resources:
+    requests:
+      cpu: ${CPU_REQUEST:-500m}
+      memory: ${MEMORY_REQUEST:-1Gi}
+    limits:
+      cpu: ${CPU_LIMIT:-1000m}
+      memory: ${MEMORY_LIMIT:-2Gi}
+
+  # PostgreSQL configuration parameters
+  postgresql:
+    parameters:
+      # Connection settings
+      max_connections: "${MAX_CONNECTIONS:-100}"
+      superuser_reserved_connections: "${SUPERUSER_RESERVED_CONNECTIONS:-3}"
+
+      # Memory settings
+      shared_buffers: "${SHARED_BUFFERS:-256MB}"
+      effective_cache_size: "${EFFECTIVE_CACHE_SIZE:-1GB}"
+      work_mem: "${WORK_MEM:-4MB}"
+      maintenance_work_mem: "${MAINTENANCE_WORK_MEM:-64MB}"
+
+      # WAL settings
+      wal_buffers: "${WAL_BUFFERS:-8MB}"
+      max_wal_size: "${MAX_WAL_SIZE:-1GB}"
+      min_wal_size: "${MIN_WAL_SIZE:-80MB}"
+
+      # Checkpoint settings
+      checkpoint_completion_target: "${CHECKPOINT_COMPLETION_TARGET:-0.9}"
+
+      # Query planner settings
+      random_page_cost: "${RANDOM_PAGE_COST:-1.1}"
+      effective_io_concurrency: "${EFFECTIVE_IO_CONCURRENCY:-200}"
+
+      # Logging
+      log_destination: "csvlog"
+      logging_collector: "on"
+      log_directory: "/controller/log"
+      log_filename: "postgres"
+      log_rotation_age: "0"
+      log_rotation_size: "0"
+      log_truncate_on_rotation: "false"
+      log_checkpoints: "on"
+      log_connections: "off"
+      log_disconnections: "off"
+      log_lock_waits: "on"
+      log_min_duration_statement: "${LOG_MIN_DURATION_STATEMENT:--1}"
+      log_statement: "${LOG_STATEMENT:-none}"
+      log_line_prefix: "${LOG_LINE_PREFIX:-%m [%p] %q%u@%d }"
+
+---
+# Application user secret
+# This secret contains credentials for the application database user.
+# CloudNativePG will create this user automatically.
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ${CLUSTER_NAME:-pg-cluster}-app-user
+  namespace: ${CLUSTER_NAMESPACE:-default}
+type: kubernetes.io/basic-auth
+stringData:
+  username: ${DATABASE_OWNER:-app}
+  password: ${DATABASE_PASSWORD:-changeme}
