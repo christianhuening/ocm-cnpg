@@ -1,0 +1,41 @@
+# Custom PostgreSQL Image with TimescaleDB Extension
+# Build: docker build -t my-registry.com/postgresql-timescaledb:16 -f Dockerfile.timescaledb .
+
+ARG PG_VERSION=16
+FROM ghcr.io/cloudnative-pg/postgresql:${PG_VERSION}
+
+# Switch to root to install packages
+USER root
+
+# Install TimescaleDB
+RUN set -ex && \
+    apt-get update && \
+    apt-get install -y \
+        wget \
+        gnupg \
+        lsb-release && \
+    # Add TimescaleDB repository
+    echo "deb https://packagecloud.io/timescale/timescaledb/debian/ $(lsb_release -c -s) main" | \
+        tee /etc/apt/sources.list.d/timescaledb.list && \
+    wget --quiet -O - https://packagecloud.io/timescale/timescaledb/gpgkey | \
+        apt-key add - && \
+    # Install TimescaleDB
+    apt-get update && \
+    apt-get install -y \
+        timescaledb-2-postgresql-${PG_VERSION} && \
+    # Clean up
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Configure PostgreSQL to load TimescaleDB
+RUN echo "shared_preload_libraries = 'timescaledb'" >> /usr/share/postgresql/postgresql.conf.sample
+
+# Switch back to postgres user
+USER 26
+
+# Labels for OCM and container registries
+LABEL org.opencontainers.image.title="PostgreSQL with TimescaleDB"
+LABEL org.opencontainers.image.description="CloudNativePG-compatible PostgreSQL image with TimescaleDB extension"
+LABEL org.opencontainers.image.source="https://github.com/cloudnative-pg/cloudnative-pg"
+LABEL cnpg.io/extensions="timescaledb"
+LABEL cnpg.io/extension-type="timeseries"

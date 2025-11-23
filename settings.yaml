@@ -20,3 +20,7 @@ PG_VERSION_15: "15"
 PG_VERSION_14: "14"
 
 # Note: PostgreSQL version 16 is marked as the default version in the component descriptor
+
+# Extension Versions (for component references)
+# PostGIS version follows format: <pg_version>-<postgis_version>
+POSTGIS_VERSION: "16-3.4"

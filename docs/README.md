@@ -12,6 +12,14 @@ Complete guide for deploying CloudNativePG in air-gapped environments. Covers:
 - Complete deployment workflow examples
 - Troubleshooting
 
+### [Advanced Features](ADVANCED_FEATURES.md)
+Advanced features and capabilities including:
+- Multi-architecture support (amd64, arm64, ppc64le, s390x)
+- Configuration validation with JSON Schema
+- Component references for PostgreSQL extensions
+- Building and using custom PostgreSQL images
+- Extension management and best practices
+
 ## Quick Start
 
 ### Standard Deployment

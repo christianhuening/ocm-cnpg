@@ -5,6 +5,18 @@ components:
     provider:
       name: ${PROVIDER_NAME}
 
+    # Component references for optional PostgreSQL extensions
+    # These are external components that can be deployed alongside the base cluster
+    componentReferences:
+      - name: postgis
+        componentName: ghcr.io/cloudnative-pg/postgis
+        version: "${POSTGIS_VERSION:-16-3.4}"
+        labels:
+          - name: "cnpg.io/extension-type"
+            value: "geospatial"
+          - name: "cnpg.io/extension-category"
+            value: "spatial-data"
+
     labels:
       - name: "org.opencontainers.image.source"
         value: "https://github.com/cloudnative-pg/cloudnative-pg"
@@ -211,3 +223,19 @@ components:
             value: "cluster"
           - name: "cnpg.io/template-profile"
             value: "monitoring"
+
+      # ============================================
+      # Validation Schema
+      # ============================================
+      - name: cluster-schema
+        type: jsonSchema
+        version: "1.0.0"
+        relation: local
+        input:
+          type: file
+          path: ./resources/schemas/cluster-schema.json
+        labels:
+          - name: "cnpg.io/schema-type"
+            value: "cluster-validation"
+          - name: "cnpg.io/schema-version"
+            value: "v1"

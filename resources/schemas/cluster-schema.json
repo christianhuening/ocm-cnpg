@@ -1,0 +1,506 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://cloudnative-pg.io/schemas/cluster.json",
+  "title": "CloudNativePG Cluster Configuration",
+  "description": "JSON Schema for validating CloudNativePG Cluster resources",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "const": "postgresql.cnpg.io/v1",
+      "description": "API version for CloudNativePG Cluster"
+    },
+    "kind": {
+      "type": "string",
+      "const": "Cluster",
+      "description": "Resource kind"
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+          "maxLength": 63,
+          "description": "Name of the cluster (DNS-1123 compliant)"
+        },
+        "namespace": {
+          "type": "string",
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+          "maxLength": 63,
+          "description": "Namespace for the cluster"
+        },
+        "labels": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Labels to apply to the cluster"
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Annotations to apply to the cluster"
+        }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": ["instances"],
+      "properties": {
+        "instances": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Number of PostgreSQL instances in the cluster"
+        },
+        "imageName": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(([._-][a-z0-9]+)*\\/)*[a-z0-9]+(([._-][a-z0-9]+)*)(:[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127})?$",
+          "description": "PostgreSQL container image reference"
+        },
+        "imagePullPolicy": {
+          "type": "string",
+          "enum": ["Always", "IfNotPresent", "Never"],
+          "description": "Image pull policy"
+        },
+        "imagePullSecrets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": {
+                "type": "string"
+              }
+            }
+          },
+          "description": "Image pull secrets for private registries"
+        },
+        "minSyncReplicas": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Minimum number of synchronous replicas"
+        },
+        "maxSyncReplicas": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Maximum number of synchronous replicas"
+        },
+        "primaryUpdateStrategy": {
+          "type": "string",
+          "enum": ["unsupervised", "supervised"],
+          "description": "Strategy for primary updates"
+        },
+        "primaryUpdateMethod": {
+          "type": "string",
+          "enum": ["switchover", "restart"],
+          "description": "Method for primary updates"
+        },
+        "bootstrap": {
+          "type": "object",
+          "oneOf": [
+            {"required": ["initdb"]},
+            {"required": ["recovery"]},
+            {"required": ["pg_basebackup"]}
+          ],
+          "properties": {
+            "initdb": {
+              "type": "object",
+              "properties": {
+                "database": {
+                  "type": "string",
+                  "description": "Name of the application database"
+                },
+                "owner": {
+                  "type": "string",
+                  "description": "Owner of the application database"
+                },
+                "secret": {
+                  "type": "object",
+                  "required": ["name"],
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "options": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Additional initdb options"
+                },
+                "postInitSQL": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "SQL statements to run after initdb"
+                },
+                "postInitApplicationSQL": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "SQL statements to run in application database"
+                }
+              }
+            },
+            "recovery": {
+              "type": "object",
+              "description": "Bootstrap from backup/PITR"
+            },
+            "pg_basebackup": {
+              "type": "object",
+              "description": "Bootstrap from streaming replication"
+            }
+          }
+        },
+        "storage": {
+          "type": "object",
+          "properties": {
+            "size": {
+              "type": "string",
+              "pattern": "^[0-9]+(\\.[0-9]+)?(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|k)?$",
+              "description": "Storage size (e.g., 10Gi, 100Mi)"
+            },
+            "storageClass": {
+              "type": "string",
+              "description": "StorageClass name"
+            },
+            "pvcTemplate": {
+              "type": "object",
+              "description": "PVC template for customization"
+            },
+            "resizeInUseVolumes": {
+              "type": "boolean",
+              "description": "Allow resizing of in-use volumes"
+            }
+          }
+        },
+        "walStorage": {
+          "type": "object",
+          "properties": {
+            "size": {
+              "type": "string",
+              "pattern": "^[0-9]+(\\.[0-9]+)?(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|k)?$",
+              "description": "WAL storage size"
+            },
+            "storageClass": {
+              "type": "string",
+              "description": "WAL StorageClass name"
+            }
+          }
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "requests": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": "string",
+                  "pattern": "^[0-9]+(\\.[0-9]+)?m?$",
+                  "description": "CPU request (e.g., 500m, 2)"
+                },
+                "memory": {
+                  "type": "string",
+                  "pattern": "^[0-9]+(\\.[0-9]+)?(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|k)?$",
+                  "description": "Memory request"
+                }
+              }
+            },
+            "limits": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": "string",
+                  "pattern": "^[0-9]+(\\.[0-9]+)?m?$",
+                  "description": "CPU limit"
+                },
+                "memory": {
+                  "type": "string",
+                  "pattern": "^[0-9]+(\\.[0-9]+)?(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|k)?$",
+                  "description": "Memory limit"
+                }
+              }
+            }
+          }
+        },
+        "postgresql": {
+          "type": "object",
+          "properties": {
+            "parameters": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "PostgreSQL configuration parameters"
+            },
+            "pg_hba": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Custom pg_hba.conf entries"
+            },
+            "pg_ident": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Custom pg_ident.conf entries"
+            },
+            "promotionTimeout": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Promotion timeout in seconds"
+            },
+            "ldap": {
+              "type": "object",
+              "description": "LDAP authentication configuration"
+            }
+          }
+        },
+        "backup": {
+          "type": "object",
+          "properties": {
+            "barmanObjectStore": {
+              "type": "object",
+              "required": ["destinationPath"],
+              "properties": {
+                "destinationPath": {
+                  "type": "string",
+                  "description": "Backup destination path (s3://, gs://, etc.)"
+                },
+                "endpointURL": {
+                  "type": "string",
+                  "format": "uri",
+                  "description": "S3-compatible endpoint URL"
+                },
+                "s3Credentials": {
+                  "type": "object",
+                  "description": "S3 credentials secret reference"
+                },
+                "azureCredentials": {
+                  "type": "object",
+                  "description": "Azure credentials secret reference"
+                },
+                "googleCredentials": {
+                  "type": "object",
+                  "description": "Google Cloud credentials secret reference"
+                },
+                "wal": {
+                  "type": "object",
+                  "properties": {
+                    "compression": {
+                      "type": "string",
+                      "enum": ["gzip", "bzip2", "snappy", "none"],
+                      "description": "WAL compression method"
+                    },
+                    "encryption": {
+                      "type": "string",
+                      "enum": ["AES256", "aws:kms"],
+                      "description": "WAL encryption method"
+                    },
+                    "maxParallel": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "description": "Maximum parallel WAL archiving processes"
+                    }
+                  }
+                },
+                "data": {
+                  "type": "object",
+                  "properties": {
+                    "compression": {
+                      "type": "string",
+                      "enum": ["gzip", "bzip2", "snappy", "none"],
+                      "description": "Backup compression method"
+                    },
+                    "encryption": {
+                      "type": "string",
+                      "enum": ["AES256", "aws:kms"],
+                      "description": "Backup encryption method"
+                    },
+                    "jobs": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "description": "Number of parallel backup jobs"
+                    },
+                    "immediateCheckpoint": {
+                      "type": "boolean",
+                      "description": "Force immediate checkpoint before backup"
+                    }
+                  }
+                },
+                "retentionPolicy": {
+                  "type": "string",
+                  "pattern": "^[0-9]+[dwmy]$",
+                  "description": "Backup retention policy (e.g., 30d, 4w, 12m)"
+                }
+              }
+            },
+            "volumeSnapshot": {
+              "type": "object",
+              "properties": {
+                "className": {
+                  "type": "string",
+                  "description": "VolumeSnapshotClass name"
+                },
+                "online": {
+                  "type": "boolean",
+                  "description": "Take online snapshots"
+                },
+                "snapshotOwnerReference": {
+                  "type": "string",
+                  "enum": ["none", "cluster", "backup"],
+                  "description": "Owner reference for snapshots"
+                }
+              }
+            },
+            "retentionPolicy": {
+              "type": "string",
+              "pattern": "^[0-9]+[dwmy]$",
+              "description": "Default retention policy"
+            },
+            "target": {
+              "type": "string",
+              "enum": ["primary", "prefer-standby"],
+              "description": "Backup target instance"
+            }
+          }
+        },
+        "monitoring": {
+          "type": "object",
+          "properties": {
+            "enablePodMonitor": {
+              "type": "boolean",
+              "description": "Enable Prometheus PodMonitor"
+            },
+            "customQueriesConfigMap": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["name", "key"],
+                "properties": {
+                  "name": {"type": "string"},
+                  "key": {"type": "string"}
+                }
+              },
+              "description": "Custom monitoring queries from ConfigMap"
+            },
+            "customQueriesSecret": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["name", "key"],
+                "properties": {
+                  "name": {"type": "string"},
+                  "key": {"type": "string"}
+                }
+              },
+              "description": "Custom monitoring queries from Secret"
+            }
+          }
+        },
+        "affinity": {
+          "type": "object",
+          "description": "Pod affinity rules"
+        },
+        "nodeSelector": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Node selector labels"
+        },
+        "tolerations": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          },
+          "description": "Pod tolerations"
+        },
+        "topologySpreadConstraints": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          },
+          "description": "Topology spread constraints"
+        },
+        "serviceAccountTemplate": {
+          "type": "object",
+          "description": "ServiceAccount template"
+        },
+        "certificates": {
+          "type": "object",
+          "properties": {
+            "serverCASecret": {
+              "type": "string",
+              "description": "Server CA certificate secret"
+            },
+            "serverTLSSecret": {
+              "type": "string",
+              "description": "Server TLS certificate secret"
+            },
+            "replicationTLSSecret": {
+              "type": "string",
+              "description": "Replication TLS certificate secret"
+            },
+            "clientCASecret": {
+              "type": "string",
+              "description": "Client CA certificate secret"
+            }
+          }
+        },
+        "enableSuperuserAccess": {
+          "type": "boolean",
+          "description": "Enable superuser access via secrets"
+        },
+        "superuserSecret": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            }
+          },
+          "description": "Superuser credentials secret"
+        },
+        "externalClusters": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          },
+          "description": "External PostgreSQL clusters for replication"
+        },
+        "env": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": {"type": "string"},
+              "value": {"type": "string"},
+              "valueFrom": {"type": "object"}
+            }
+          },
+          "description": "Environment variables for PostgreSQL pods"
+        },
+        "envFrom": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          },
+          "description": "Environment variables from ConfigMap/Secret"
+        }
+      }
+    }
+  }
+}

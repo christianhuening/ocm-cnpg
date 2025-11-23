@@ -1,0 +1,41 @@
+# Custom PostgreSQL Image with pgvector Extension
+# Build: docker build -t my-registry.com/postgresql-pgvector:16 -f Dockerfile.pgvector .
+
+ARG PG_VERSION=16
+FROM ghcr.io/cloudnative-pg/postgresql:${PG_VERSION}
+
+# Switch to root to install packages
+USER root
+
+# Install pgvector
+ARG PGVECTOR_VERSION=0.5.1
+RUN set -ex && \
+    apt-get update && \
+    apt-get install -y \
+        git \
+        build-essential \
+        postgresql-server-dev-${PG_VERSION} && \
+    # Clone and build pgvector
+    cd /tmp && \
+    git clone --branch v${PGVECTOR_VERSION} https://github.com/pgvector/pgvector.git && \
+    cd pgvector && \
+    make && \
+    make install && \
+    # Clean up
+    cd / && \
+    rm -rf /tmp/pgvector && \
+    apt-get remove -y git build-essential postgresql-server-dev-${PG_VERSION} && \
+    apt-get autoremove -y && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Switch back to postgres user
+USER 26
+
+# Labels
+LABEL org.opencontainers.image.title="PostgreSQL with pgvector"
+LABEL org.opencontainers.image.description="CloudNativePG-compatible PostgreSQL image with pgvector extension for vector similarity search"
+LABEL org.opencontainers.image.source="https://github.com/cloudnative-pg/cloudnative-pg"
+LABEL cnpg.io/extensions="pgvector"
+LABEL cnpg.io/extension-type="vector-search"
+LABEL cnpg.io/pgvector-version="${PGVECTOR_VERSION}"
