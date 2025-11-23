@@ -25,7 +25,7 @@ components:
         relation: external
         access:
           type: ociArtifact
-          imageReference: ${OPERATOR_REGISTRY}/cloudnative-pg:${CNPG_VERSION}
+          imageReference: ghcr.io/cloudnative-pg/cloudnative-pg:${CNPG_VERSION}
         labels:
           - name: "architecture.ocm.io/platforms"
             value: "linux/amd64,linux/arm64,linux/ppc64le,linux/s390x"
@@ -41,7 +41,7 @@ components:
         relation: external
         access:
           type: ociArtifact
-          imageReference: ${POSTGRESQL_REGISTRY}/postgresql:${PG_VERSION_17}
+          imageReference: ghcr.io/cloudnative-pg/postgresql:${PG_VERSION_17}
         labels:
           - name: "architecture.ocm.io/platforms"
             value: "linux/amd64,linux/arm64,linux/ppc64le,linux/s390x"
@@ -59,7 +59,7 @@ components:
         relation: external
         access:
           type: ociArtifact
-          imageReference: ${POSTGRESQL_REGISTRY}/postgresql:${PG_VERSION_16}
+          imageReference: ghcr.io/cloudnative-pg/postgresql:${PG_VERSION_16}
         labels:
           - name: "architecture.ocm.io/platforms"
             value: "linux/amd64,linux/arm64,linux/ppc64le,linux/s390x"
@@ -79,7 +79,7 @@ components:
         relation: external
         access:
           type: ociArtifact
-          imageReference: ${POSTGRESQL_REGISTRY}/postgresql:${PG_VERSION_15}
+          imageReference: ghcr.io/cloudnative-pg/postgresql:${PG_VERSION_15}
         labels:
           - name: "architecture.ocm.io/platforms"
             value: "linux/amd64,linux/arm64,linux/ppc64le,linux/s390x"
@@ -97,7 +97,7 @@ components:
         relation: external
         access:
           type: ociArtifact
-          imageReference: ${POSTGRESQL_REGISTRY}/postgresql:${PG_VERSION_14}
+          imageReference: ghcr.io/cloudnative-pg/postgresql:${PG_VERSION_14}
         labels:
           - name: "architecture.ocm.io/platforms"
             value: "linux/amd64,linux/arm64,linux/ppc64le,linux/s390x"

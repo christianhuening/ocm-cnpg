@@ -7,11 +7,6 @@
 COMPONENT_NAME: "ocm.software/cloudnative-pg"
 PROVIDER_NAME: "ocm.software"
 
-# Image Registry Configuration
-# Override these to pull images from private registries
-OPERATOR_REGISTRY: "ghcr.io/cloudnative-pg"
-POSTGRESQL_REGISTRY: "ghcr.io/cloudnative-pg"
-
 # CloudNativePG Operator Version
 # See: https://github.com/cloudnative-pg/cloudnative-pg/releases
 CNPG_VERSION: "1.24.1"

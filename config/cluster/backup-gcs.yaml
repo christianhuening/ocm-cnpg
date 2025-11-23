@@ -21,7 +21,10 @@ metadata:
 
 spec:
   instances: ${INSTANCES:-3}
-  imageName: ghcr.io/cloudnative-pg/postgresql:${POSTGRES_VERSION:-16}
+
+  # PostgreSQL image
+  # In air-gapped environments, override with relocated registry
+  imageName: ${IMAGE_NAME:-ghcr.io/cloudnative-pg/postgresql:${POSTGRES_VERSION:-16}}
 
   bootstrap:
     initdb:

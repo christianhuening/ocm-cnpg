@@ -30,7 +30,9 @@ spec:
   maxSyncReplicas: ${MAX_SYNC_REPLICAS:-2}
 
   # PostgreSQL image
-  imageName: ghcr.io/cloudnative-pg/postgresql:${POSTGRES_VERSION:-16}
+  # In air-gapped environments, override with relocated registry
+  # Example: my-registry.company.com/cloudnative-pg/postgresql:16
+  imageName: ${IMAGE_NAME:-ghcr.io/cloudnative-pg/postgresql:${POSTGRES_VERSION:-16}}
 
   # Bootstrap configuration
   bootstrap:

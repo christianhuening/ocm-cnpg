@@ -49,10 +49,12 @@ data:
 
   # Default PostgreSQL image for new clusters
   # If not set, uses the operator's default
+  # In air-gapped environments, set this to your relocated registry
   POSTGRES_IMAGE_NAME: "${POSTGRES_IMAGE_NAME:-ghcr.io/cloudnative-pg/postgresql:16}"
 
   # Operator image used for pod bootstrapping
   # If not set, uses the image from the operator deployment
+  # In air-gapped environments, set this to your relocated registry
   OPERATOR_IMAGE_NAME: "${OPERATOR_IMAGE_NAME}"
 
   # ============================================

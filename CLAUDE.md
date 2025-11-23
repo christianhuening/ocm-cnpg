@@ -200,20 +200,10 @@ ocm add componentversions \
     CNPG_VERSION=1.27.0 \
     PG16_VERSION=16.8
 
-# Build with custom registries for private images
-ocm add componentversions \
-    --create \
-    --file ./build \
-    ./component-constructor.yaml \
-    OPERATOR_REGISTRY=my-registry.example.com/cloudnative-pg \
-    POSTGRESQL_REGISTRY=my-registry.example.com/postgresql \
-    CNPG_VERSION=1.27.0 \
-    PG16_VERSION=16.8
-
 # Examine component
 ocm get componentversions ./build -o yaml
 
-# Transfer to registry
+# Transfer to registry (OCM relocates images automatically)
 ocm transfer componentversions ./build ghcr.io/your-org/ocm
 ```
 
@@ -226,27 +216,34 @@ Variables are resolved in this order:
 
 This allows flexible override mechanisms for different deployment scenarios.
 
-### Private Registry Configuration
+### Air-Gapped Deployment
 
-To use images from private registries instead of the official ghcr.io repositories:
+For air-gapped environments, OCM handles image relocation automatically during transfer. The deployment manifests support configurable image references to use relocated images:
 
-**Option 1: Via settings.yaml**
-```yaml
-OPERATOR_REGISTRY: "my-registry.example.com/cloudnative-pg"
-POSTGRESQL_REGISTRY: "my-registry.example.com/postgresql"
-```
-
-**Option 2: Via environment variables**
+**Component Transfer** (OCM relocates images):
 ```bash
-export OPERATOR_REGISTRY=my-registry.example.com/cloudnative-pg
-export POSTGRESQL_REGISTRY=my-registry.example.com/postgresql
-make build
+# Transfer component to air-gapped registry
+# OCM automatically relocates all images
+ocm transfer componentversions ./build my-airgap-registry.company.com/ocm
 ```
 
-**Option 3: Via Makefile variables**
+**Deployment Configuration** (configure manifests to use relocated images):
+
+All cluster templates support the `IMAGE_NAME` variable:
 ```bash
-make build OPERATOR_REGISTRY=my-registry.example.com/cloudnative-pg \
-           POSTGRESQL_REGISTRY=my-registry.example.com/postgresql
+# Set relocated image path
+export IMAGE_NAME="my-airgap-registry.company.com/ocm/postgresql:16"
+
+# Deploy with relocated image
+envsubst < cluster.yaml | kubectl apply -f -
 ```
 
-The registries can be configured independently, allowing mixed scenarios where the operator comes from one registry and PostgreSQL images from another.
+Operator configuration supports `POSTGRES_IMAGE_NAME` and `OPERATOR_IMAGE_NAME`:
+```bash
+export POSTGRES_IMAGE_NAME="my-airgap-registry.company.com/ocm/postgresql:16"
+export OPERATOR_IMAGE_NAME="my-airgap-registry.company.com/ocm/cloudnative-pg:1.24.1"
+
+envsubst < operator-configmap.yaml | kubectl apply -f -
+```
+
+See [docs/AIR_GAPPED_DEPLOYMENT.md](docs/AIR_GAPPED_DEPLOYMENT.md) for complete air-gapped deployment guide.
